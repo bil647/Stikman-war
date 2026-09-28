@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stick Man Fight</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #111;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
+
+#scene {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-height: 400px;
+  background:
+    linear-gradient(#d9d9d9 0%, #eeeeee 65%, #777 65%, #555 100%);
+  overflow: hidden;
+}
+
+/* الأرض */
+#ground {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 35%;
+  border-top: 4px solid #222;
+}
+
+/* الشخصيات */
+.fighter {
+  position: absolute;
+  bottom: 35%;
+  width: 80px;
+  height: 180px;
+  transform-origin: bottom center;
+}
+
+#black {
+  left: 18%;
+}
+
+#red {
+  left: 72%;
+}
+
+/* الرأس */
+.head {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  left: 19px;
+  top: 0;
+}
+
+#black .head {
+  background: #000;
+}
+
+#red .head {
+  background: #d60000;
+}
+
+/* الجسم */
+.body {
+  position: absolute;
+  width: 8px;
+  height: 75px;
+  left: 36px;
+  top: 40px;
+  border-radius: 5px;
+}
+
+#black .body {
+  background: #000;
+}
+
+#red .body {
+  background: #d60000;
+}
+
+/* الأذرع والأرجل */
+.limb {
+  position: absolute;
+  height: 8px;
+  border-radius: 5px;
+  transform-origin: left center;
+}
+
+#black .limb {
+  background: #000;
+}
+
+#red .limb {
+  background: #d60000;
+}
+
+.arm1 {
+  width: 65px;
+  left: 36px;
+  top: 55px;
+  transform: rotate(145deg);
+}
+
+.arm2 {
+  width: 65px;
+  left: 36px;
+  top: 55px;
+  transform: rotate(35deg);
+}
+
+.leg1 {
+  width: 80px;
+  left: 36px;
+  top: 110px;
+  transform: rotate(115deg);
+}
+
+.leg2 {
+  width: 80px;
+  left: 36px;
+  top: 110px;
+  transform: rotate(65deg);
+}
+
+/* العنوان */
+#title {
+  position: absolute;
+  top: 20px;
+  width: 100%;
+  text-align: center;
+  font-size: 28px;
+  font-weight: bold;
+  color: #222;
+}
+
+/* المؤقت */
+#timer {
+  position: absolute;
+  top: 60px;
+  width: 100%;
+  text-align: center;
+  font-size: 20px;
+  color: #333;
+}
+
+/* زر البداية */
+#start {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 15px 35px;
+  font-size: 20px;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  background: #222;
+  color: white;
+  cursor: pointer;
+}
+
+/* تأثير الضربة */
+.hit {
+  position: absolute;
+  font-size: 45px;
+  font-weight: bold;
+  color: #222;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* اهتزاز الشاشة */
+.shake {
+  animation: shake 0.18s linear;
+}
+
+@keyframes shake {
+  0% { transform: translate(0); }
+  25% { transform: translate(8px, -4px); }
+  50% { transform: translate(-8px, 4px); }
+  75% { transform: translate(5px, 2px); }
+  100% { transform: translate(0); }
+}
+</style>
+</head>
+
+<body>
+
+<div id="scene">
+
+  <div id="title">BLACK vs RED</div>
+  <div id="timer">00:00</div>
+
+  <button id="start">ابدأ القتال</button>
+
+  <div id="black" class="fighter">
+    <div class="head"></div>
+    <div class="body"></div>
+    <div class="limb arm1"></div>
+    <div class="limb arm2"></div>
+    <div class="limb leg1"></div>
+    <div class="limb leg2"></div>
+  </div>
+
+  <div id="red" class="fighter">
+    <div class="head"></div>
+    <div class="body"></div>
+    <div class="limb arm1"></div>
+    <div class="limb arm2"></div>
+    <div class="limb leg1"></div>
+    <div class="limb leg2"></div>
+  </div>
+
+  <div id="ground"></div>
+
+</div>
+
+<script>
+
+const black = document.getElementById("black");
+const red = document.getElementById("red");
+const scene = document.getElementById("scene");
+const timer = document.getElementById("timer");
+const start = document.getElementById("start");
+
+let startTime;
+let running = false;
+
+function position(element, x, y = 0, rotate = 0, scale = 1) {
+  element.style.left = x + "%";
+  element.style.bottom = `calc(35% + ${y}px)`;
+  element.style.transform =
+    `rotate(${rotate}deg) scale(${scale})`;
+}
+
+function hitEffect(x, y, text = "BOOM!") {
+
+  const hit = document.createElement("div");
+
+  hit.className = "hit";
+  hit.innerText = text;
+
+  hit.style.left = x + "%";
+  hit.style.top = y + "%";
+  hit.style.opacity = "1";
+
+  scene.appendChild(hit);
+
+  setTimeout(() => {
+    hit.style.transition = "0.4s";
+    hit.style.opacity = "0";
+    hit.style.transform = "scale(1.5)";
+
+    setTimeout(() => hit.remove(), 500);
+
+  }, 100);
+}
+
+function shake() {
+
+  scene.classList.remove("shake");
+
+  void scene.offsetWidth;
+
+  scene.classList.add("shake");
+}
+
+function fight(time) {
+
+  /*
+  0 - 5
+  الشخصيتان تقتربان
+  */
+
+  if (time < 5) {
+
+    let p = time / 5;
+
+    position(black, 18 + p * 20);
+    position(red, 72 - p * 20);
+
+  }
+
+  /*
+  5 - 10
+  وقفة استعداد
+  */
+
+  else if (time < 10) {
+
+    position(black, 38, 0, -5);
+    position(red, 52, 0, 5);
+
+  }
+
+  /*
+  10 - 15
+  الأسود يهاجم
+  */
+
+  else if (time < 15) {
+
+    let p = (time - 10) / 5;
+
+    position(
+      black,
+      38 + p * 8,
+      0,
+      -10 + p * 20
+    );
+
+    position(
+      red,
+      52 + p * 3,
+      0,
+      5
+    );
+
+  }
+
+  /*
+  15 - 20
+  الأحمر يتفادى
+  */
+
+  else if (time < 20) {
+
+    let p = (time - 15) / 5;
+
+    position(
+      black,
+      46,
+      0,
+      20
+    );
+
+    position(
+      red,
+      55,
+      Math.sin(p * Math.PI) * 50,
+      -20
+    );
+
+  }
+
+  /*
+  20 - 25
+  الأحمر يرد بركلة
+  */
+
+  else if (time < 25) {
+
+    let p = (time - 20) / 5;
+
+    position(
+      red,
+      55 - p * 5,
+      Math.sin(p * Math.PI) * 80,
+      20
+    );
+
+    position(
+      black,
+      46,
+      0,
+      -10
+    );
+
+  }
+
+  /*
+  25 - 30
+  الأسود يقفز
+  */
+
+  else if (time < 30) {
+
+    let p = (time - 25) / 5;
+
+    position(
+      black,
+      46 + Math.sin(p * Math.PI) * 8,
+      Math.sin(p * Math.PI) * 140,
+      p * 360
+    );
+
+    position(red, 53, 0, 0);
+
+  }
+
+  /*
+  30 - 35
+  تصادم في الهواء
+  */
+
+  else if (time < 35) {
+
+    let p = (time - 30) / 5;
+
+    position(
+      black,
+      48 + p * 4,
+      100 + Math.sin(p * Math.PI) * 50,
+      180
+    );
+
+    position(
+      red,
+      52 - p * 4,
+      100 + Math.sin(p * Math.PI) * 50,
+      -180
+    );
+
+  }
+
+  /*
+  35 - 40
+  سقوط
+  */
+
+  else if (time < 40) {
+
+    let p = (time - 35) / 5;
+
+    position(
+      black,
+      52,
+      100 - p * 100,
+      180 + p * 90
+    );
+
+    position(
+      red,
+      48,
+      100 - p * 100,
+      -180 - p * 90
+    );
+
+  }
+
+  /*
+  40 - 45
+  الأسود ينهض
+  */
+
+  else if (time < 45) {
+
+    let p = (time - 40) / 5;
+
+    position(
+      black,
+      40 + p * 5,
+      0,
+      -20
+    );
+
+    position(
+      red,
+      55,
+      0,
+      10
+    );
+
+  }
+
+  /*
+  45 - 50
+  هجوم سريع
+  */
+
+  else if (time < 50) {
+
+    let p = (time - 45) / 5;
+
+    position(
+      black,
+      45 + Math.sin(p * Math.PI * 3) * 5,
+      0,
+      p * 720
+    );
+
+    position(
+      red,
+      53 - Math.sin(p * Math.PI * 3) * 5,
+      0,
+      -p * 720
+    );
+
+  }
+
+  /*
+  50 - 55
+  الضربة النهائية
+  */
+
+  else if (time < 55) {
+
+    let p = (time - 50) / 5;
+
+    position(
+      black,
+      45 + p * 8,
+      Math.sin(p * Math.PI) * 30,
+      0
+    );
+
+    position(
+      red,
+      53,
+      Math.sin(p * Math.PI) * 30,
+      0
+    );
+
+  }
+
+  /*
+  55 - 60
+  النهاية
+  */
+
+  else {
+
+    position(black, 52, 0, -5);
+    position(red, 47, 0, 5);
+
+  }
+
+}
+
+/* مؤثرات الضربات */
+
+function effects(time) {
+
+  const seconds = Math.floor(time);
+
+  if (
+    seconds === 12 ||
+    seconds === 21 ||
+    seconds === 28 ||
+    seconds === 34 ||
+    seconds === 47 ||
+    seconds === 52
+  ) {
+
+    if (!window.lastHit || window.lastHit !== seconds) {
+
+      window.lastHit = seconds;
+
+      hitEffect(
+        45 + Math.random() * 10,
+        35 + Math.random() * 20,
+        seconds === 52 ? "K.O!" : "POW!"
+      );
+
+      shake();
+    }
+  }
+}
+
+function loop() {
+
+  if (!running) return;
+
+  const elapsed = (Date.now() - startTime) / 1000;
+
+  const time = Math.min(elapsed, 60);
+
+  timer.innerText =
+    "00:" + String(Math.floor(time)).padStart(2, "0");
+
+  fight(time);
+  effects(time);
+
+  if (time < 60) {
+
+    requestAnimationFrame(loop);
+
+  } else {
+
+    running = false;
+    start.style.display = "block";
+    start.innerText = "إعادة القتال";
+
+  }
+}
+
+start.onclick = function() {
+
+  running = true;
+
+  start.style.display = "none";
+
+  startTime = Date.now();
+
+  window.lastHit = null;
+
+  loop();
+};
+
+</script>
+
+</body>
+</html>
